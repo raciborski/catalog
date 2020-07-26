@@ -14,6 +14,10 @@
 
 #include <sqlite3.h>
 
+typedef struct node_ops_t {
+  sqlite3_stmt *select, *insert, *update, *select_root;
+} node_ops_t;
+
 typedef enum node_type_t { TYPE_FOLDER, TYPE_FILE } node_type_t;
 
 typedef enum node_status_t {
@@ -32,10 +36,20 @@ typedef struct node_t {
   node_status_t status;
 } node_t;
 
-void node_ops_init(sqlite3 *db);
-void node_ops_dest(void);
-bool node_select(node_t *self, int parent, const char *name);
-bool node_insert(node_t *self);
-bool node_update(const node_t *node);
+typedef struct node_list_t {
+  node_t *items;
+  size_t length, size;
+} node_list_t;
+
+void node_ops_init(node_ops_t *self, sqlite3 *db);
+void node_ops_dest(node_ops_t *self);
+bool node_ops_select(node_ops_t *self, node_t *node, int parent,
+                     const char *name);
+bool node_ops_insert(node_ops_t *self, node_t *node);
+bool node_ops_update(node_ops_t *self, const node_t *node);
+void node_list_init(node_list_t *self);
+void node_list_dest(node_list_t *self);
+node_t *node_list_reserve(node_list_t *self);
+bool node_ops_select_root(node_ops_t *self, node_list_t *list);
 
 #endif
