@@ -11,6 +11,19 @@
 #include "node.h"
 
 void node_ops_init(node_ops_t *self, sqlite3 *db) {
+  sqlite3_exec(db,
+               "CREATE TABLE IF NOT EXISTS nodes("
+               "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+               "  parent INTEGER,"
+               "  name TEXT NOT NULL CHECK(length(name) > 0),"
+               "  type INTEGER NOT NULL CHECK(type BETWEEN 0 AND 1),"
+               "  date INTEGER NOT NULL CHECK(date >= 0),"
+               "  hash BLOB CHECK(length(hash) = 16),"
+               "  status INTEGER NOT NULL CHECK(status BETWEEN 0 AND 3),"
+               "  UNIQUE(parent, name),"
+               "  FOREIGN KEY(parent) REFERENCES nodes(id));",
+               NULL, NULL, NULL);
+
   sqlite3_prepare_v2(db,
                      "SELECT "
                      "  id, parent, name, type, date, hash, status "
@@ -32,6 +45,7 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
                      "SET type = ?2, date = ?3, hash = ?4, status = ?5 "
                      "WHERE id = ?1;",
                      -1, &self->update, NULL);
+
   sqlite3_prepare_v2(db,
                      "SELECT "
                      "  id, parent, name, type, date, hash, status "

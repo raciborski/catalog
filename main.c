@@ -75,19 +75,6 @@ int main(void) {
     return 1;
   }
 
-  sqlite3_exec(db,
-               "CREATE TABLE IF NOT EXISTS nodes("
-               "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-               "  parent INTEGER,"
-               "  name TEXT NOT NULL,"
-               "  type INTEGER NOT NULL,"
-               "  date INTEGER,"
-               "  hash BLOB,"
-               "  status INTEGER,"
-               "  UNIQUE(parent, name),"
-               "  FOREIGN KEY(parent) REFERENCES nodes(id));",
-               NULL, NULL, NULL);
-
   node_ops_init(&ops, db);
   node_ops_select_root(&ops, &list);
   for(i = 0;i < list.length;i++) {
