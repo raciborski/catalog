@@ -28,8 +28,9 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
                      -1, &self->insert, NULL);
 
   sqlite3_prepare_v2(db,
-                     "UPDATE nodes SET type = ?3, date = ?4, hash = ?5, "
-                     "status = ?6 WHERE parent = ?1 AND name = ?2;",
+                     "UPDATE nodes "
+                     "SET type = ?2, date = ?3, hash = ?4, status = ?5 "
+                     "WHERE id = ?1;",
                      -1, &self->update, NULL);
   sqlite3_prepare_v2(db,
                      "SELECT "
@@ -58,6 +59,28 @@ static void node_from_query(node_t *self, sqlite3_stmt *query) {
   self->status = sqlite3_column_int(query, 6);
 }
 
+static void node_bind_metadata(const node_t *self, sqlite3_stmt *query,
+                               int offset) {
+  sqlite3_bind_int(query, offset + 1, self->type);
+  sqlite3_bind_int64(query, offset + 2, self->date);
+  if(self->type == TYPE_FILE)
+    sqlite3_bind_blob(query, offset + 3, self->hash, 16, SQLITE_STATIC);
+  else
+    sqlite3_bind_null(query, offset + 3);
+  sqlite3_bind_int(query, offset + 4, self->status);
+}
+
+static void node_bind_with_id(const node_t *self, sqlite3_stmt *query) {
+  sqlite3_bind_int(query, 1, self->id);
+  node_bind_metadata(self, query, 1);
+}
+
+static void node_bind_with_path(const node_t *self, sqlite3_stmt *query) {
+  sqlite3_bind_int(query, 1, self->parent);
+  sqlite3_bind_text(query, 2, self->name, -1, SQLITE_STATIC);
+  node_bind_metadata(self, query, 2);
+}
+
 bool node_ops_select(node_ops_t *self, node_t *node, int parent,
                      const char *name) {
   bool result;
@@ -75,18 +98,9 @@ bool node_ops_insert(node_ops_t *self, node_t *node) {
   bool result;
   sqlite3_stmt *query = self->insert;
 
-  sqlite3_bind_int(query, 1, node->parent);
-  sqlite3_bind_text(query, 2, node->name, -1, SQLITE_STATIC);
-  sqlite3_bind_int(query, 3, node->type);
-  sqlite3_bind_int64(query, 4, node->date);
-  if(node->type == TYPE_FILE)
-    sqlite3_bind_blob(query, 5, node->hash, 16, SQLITE_STATIC);
-  else
-    sqlite3_bind_null(query, 5);
-  sqlite3_bind_int(query, 6, node->status);
+  node_bind_with_path(node, query);
   result = sqlite3_step(query) == SQLITE_DONE;
-  // self->id = sqlite3_last_insert_rowid(db);
-  node->id = 0;
+  node->id = sqlite3_last_insert_rowid(sqlite3_db_handle(query));
   sqlite3_reset(query);
   return result;
 }
@@ -95,15 +109,7 @@ bool node_ops_update(node_ops_t *self, const node_t *node) {
   bool result;
   sqlite3_stmt *query = self->update;
 
-  sqlite3_bind_int(query, 1, node->parent);
-  sqlite3_bind_text(query, 2, node->name, -1, SQLITE_STATIC);
-  sqlite3_bind_int(query, 3, node->type);
-  sqlite3_bind_int64(query, 4, node->date);
-  if(node->type == TYPE_FILE)
-    sqlite3_bind_blob(query, 5, node->hash, 16, SQLITE_STATIC);
-  else
-    sqlite3_bind_null(query, 5);
-  sqlite3_bind_int(query, 6, node->status);
+  node_bind_with_id(node, query);
   result = sqlite3_step(query) == SQLITE_DONE;
   sqlite3_reset(query);
   return result;
