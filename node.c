@@ -10,6 +10,9 @@
 
 #include "node.h"
 
+static const char *node_status_sym[] = {GREY "not" RESET, BGREEN "add" RESET,
+                                        RED "del" RESET, BWHITE "mod" RESET};
+
 static void node_ops_bind_id(sqlite3_stmt *query, int id);
 static void node_ops_bind_path(sqlite3_stmt *query, int parent,
                                const char *name);
@@ -30,7 +33,8 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
                "  hash BLOB CHECK(length(hash) = 16),"
                "  status INTEGER NOT NULL CHECK(status BETWEEN 0 AND 3),"
                "  UNIQUE(parent, name),"
-               "  FOREIGN KEY(parent) REFERENCES nodes(id));",
+               "  FOREIGN KEY(parent) REFERENCES nodes(id)"
+               ");",
                NULL, NULL, NULL);
 
   sqlite3_prepare_v2(db,
@@ -42,10 +46,10 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
 
   sqlite3_prepare_v2(db,
                      "INSERT INTO nodes("
-                     "  parent, name, type, date, hash, status"
+                     "  parent, name, type, date, hash, status "
                      ") "
-                     "VALUES("
-                     "  ?1, ?2, ?3, ?4, ?5, ?6"
+                     "VALUES( "
+                     "  ?1, ?2, ?3, ?4, ?5, ?6 "
                      ");",
                      -1, &self->insert, NULL);
 
@@ -67,6 +71,32 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
                      "SET status = 2 "
                      "WHERE parent IS NOT NULL;",
                      -1, &self->mark_all, NULL);
+
+  sqlite3_prepare_v2(
+    db,
+    "WITH RECURSIVE paths(id, name, status) AS ( "
+    "  SELECT "
+    "    id, name, status "
+    "  FROM "
+    "    nodes "
+    "  WHERE "
+    "    parent IS NULL "
+    "  UNION SELECT "
+    "    nodes.id, paths.name || '/' || nodes.name, nodes.status "
+    "  FROM "
+    "    nodes "
+    "  JOIN "
+    "    paths "
+    "  ON "
+    "   nodes.parent = paths.id "
+    ") "
+    "SELECT "
+    "  name, status "
+    "FROM "
+    "  paths "
+    "WHERE "
+    "  status != 0;",
+    -1, &self->print_changes, NULL);
 }
 
 void node_ops_dest(node_ops_t *self) {
@@ -75,6 +105,7 @@ void node_ops_dest(node_ops_t *self) {
   sqlite3_finalize(self->update);
   sqlite3_finalize(self->select_root);
   sqlite3_finalize(self->mark_all);
+  sqlite3_finalize(self->print_changes);
 }
 
 bool node_ops_select(node_ops_t *self, node_t *node, int parent,
@@ -128,6 +159,21 @@ bool node_ops_mark_all(node_ops_t *self) {
   result = sqlite3_step(query) == SQLITE_DONE;
   sqlite3_reset(query);
   return result;
+}
+
+bool node_ops_print_changes(node_ops_t *self) {
+  int result;
+  const char *path;
+  node_status_t status;
+  sqlite3_stmt *query = self->print_changes;
+
+  while((result = sqlite3_step(query)) == SQLITE_ROW) {
+    path = (const char *)sqlite3_column_text(query, 0);
+    status = sqlite3_column_int(query, 1);
+    printf("[%s] %s\n", node_status_sym[status], path);
+  }
+  sqlite3_reset(query);
+  return result == SQLITE_DONE;
 }
 
 static void node_ops_bind_id(sqlite3_stmt *query, int id) {

@@ -14,8 +14,15 @@
 
 #include <sqlite3.h>
 
+#define GREY   "\e[30;1m"
+#define RED    "\e[31m"
+#define BGREEN "\e[32;1m"
+#define BWHITE "\e[37;1m"
+#define RESET  "\e[0m"
+
 typedef struct node_ops_t {
-  sqlite3_stmt *select, *insert, *update, *select_root, *mark_all;
+  sqlite3_stmt *select, *insert, *update, *select_root, *mark_all,
+    *print_changes;
 } node_ops_t;
 
 typedef enum node_type_t { TYPE_FOLDER, TYPE_FILE } node_type_t;
@@ -49,6 +56,7 @@ bool node_ops_insert(node_ops_t *self, node_t *node);
 bool node_ops_update(node_ops_t *self, const node_t *node);
 bool node_ops_select_root(node_ops_t *self, node_list_t *list);
 bool node_ops_mark_all(node_ops_t *self);
+bool node_ops_print_changes(node_ops_t *self);
 void node_list_init(node_list_t *self);
 void node_list_dest(node_list_t *self);
 node_t *node_list_reserve(node_list_t *self);

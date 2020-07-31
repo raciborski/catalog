@@ -14,14 +14,15 @@
 
 #include "node.h"
 
-void visit_folder(node_ops_t *ops, int dir_id, int dir_fd) {
+bool visit_folder(node_ops_t *ops, int dir_id, int dir_fd) {
   DIR *stream;
   node_t node;
+  int newdir_fd;
   struct stat props;
   struct dirent *entry;
 
   if(dir_fd < 0 || (stream = fdopendir(dir_fd)) == NULL)
-    return;
+    return false;
 
   while((entry = readdir(stream)) != NULL) {
     if(!strcmp(".", entry->d_name) || !strcmp("..", entry->d_name))
@@ -54,18 +55,18 @@ void visit_folder(node_ops_t *ops, int dir_id, int dir_fd) {
     }
 
     if(node.type == TYPE_FOLDER) {
-      int newdir_fd = openat(dir_fd, entry->d_name, 0);
-
-      visit_folder(ops, node.id, newdir_fd);
-      close(newdir_fd);
+      newdir_fd = openat(dir_fd, entry->d_name, O_RDONLY);
+      if(visit_folder(ops, node.id, newdir_fd))
+        close(newdir_fd);
     }
   }
 
   closedir(stream);
+  return true;
 }
 
 int main(void) {
-  int i;
+  int i, dir_fd;
   sqlite3 *db;
   node_ops_t ops;
   node_list_t list;
@@ -79,9 +80,13 @@ int main(void) {
   node_ops_mark_all(&ops);
   node_ops_select_root(&ops, &list);
   for(i = 0; i < list.length; i++) {
-    printf("%d: %s\n", i, list.items[i].name);
+    dir_fd = open(list.items[i].name, O_RDONLY);
+    if(visit_folder(&ops, 1, dir_fd))
+      close(dir_fd);
+    else
+      break;
   }
-  visit_folder(&ops, 1, open("watch", O_RDONLY));
+  node_ops_print_changes(&ops);
   node_list_dest(&list);
   node_ops_dest(&ops);
 
