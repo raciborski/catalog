@@ -76,8 +76,9 @@ int main(void) {
   }
 
   node_ops_init(&ops, db);
+  node_ops_mark_all(&ops);
   node_ops_select_root(&ops, &list);
-  for(i = 0;i < list.length;i++) {
+  for(i = 0; i < list.length; i++) {
     printf("%d: %s\n", i, list.items[i].name);
   }
   visit_folder(&ops, 1, open("watch", O_RDONLY));

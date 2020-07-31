@@ -61,6 +61,12 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
                      "FROM nodes "
                      "WHERE parent IS NULL;",
                      -1, &self->select_root, NULL);
+
+  sqlite3_prepare_v2(db,
+                     "UPDATE nodes "
+                     "SET status = 2 "
+                     "WHERE parent IS NOT NULL;",
+                     -1, &self->mark_all, NULL);
 }
 
 void node_ops_dest(node_ops_t *self) {
@@ -68,6 +74,7 @@ void node_ops_dest(node_ops_t *self) {
   sqlite3_finalize(self->insert);
   sqlite3_finalize(self->update);
   sqlite3_finalize(self->select_root);
+  sqlite3_finalize(self->mark_all);
 }
 
 bool node_ops_select(node_ops_t *self, node_t *node, int parent,
@@ -112,6 +119,15 @@ bool node_ops_select_root(node_ops_t *self, node_list_t *list) {
     node_from_query(node_list_reserve(list), query);
   sqlite3_reset(query);
   return result == SQLITE_DONE;
+}
+
+bool node_ops_mark_all(node_ops_t *self) {
+  bool result;
+  sqlite3_stmt *query = self->mark_all;
+
+  result = sqlite3_step(query) == SQLITE_DONE;
+  sqlite3_reset(query);
+  return result;
 }
 
 static void node_ops_bind_id(sqlite3_stmt *query, int id) {
