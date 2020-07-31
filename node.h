@@ -47,9 +47,9 @@ bool node_ops_select(node_ops_t *self, node_t *node, int parent,
                      const char *name);
 bool node_ops_insert(node_ops_t *self, node_t *node);
 bool node_ops_update(node_ops_t *self, const node_t *node);
+bool node_ops_select_root(node_ops_t *self, node_list_t *list);
 void node_list_init(node_list_t *self);
 void node_list_dest(node_list_t *self);
 node_t *node_list_reserve(node_list_t *self);
-bool node_ops_select_root(node_ops_t *self, node_list_t *list);
 
 #endif

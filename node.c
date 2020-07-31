@@ -10,6 +10,15 @@
 
 #include "node.h"
 
+static void node_ops_bind_id(sqlite3_stmt *query, int id);
+static void node_ops_bind_path(sqlite3_stmt *query, int parent,
+                               const char *name);
+static void node_from_query(node_t *self, sqlite3_stmt *query);
+static void node_bind_with_id(const node_t *self, sqlite3_stmt *query);
+static void node_bind_with_path(const node_t *self, sqlite3_stmt *query);
+static void node_bind_metadata(const node_t *self, sqlite3_stmt *query,
+                               int offset);
+
 void node_ops_init(node_ops_t *self, sqlite3 *db) {
   sqlite3_exec(db,
                "CREATE TABLE IF NOT EXISTS nodes("
@@ -61,47 +70,12 @@ void node_ops_dest(node_ops_t *self) {
   sqlite3_finalize(self->select_root);
 }
 
-static void node_from_query(node_t *self, sqlite3_stmt *query) {
-  memset(self, 0, sizeof(node_t));
-  self->id = sqlite3_column_int(query, 0);
-  self->parent = sqlite3_column_int(query, 1);
-  strncpy(self->name, (const char *)sqlite3_column_text(query, 2), NAME_MAX);
-  self->type = sqlite3_column_int(query, 3);
-  self->date = sqlite3_column_int64(query, 4);
-  if(self->type == TYPE_FILE)
-    memcpy(self->hash, sqlite3_column_blob(query, 5), 16);
-  self->status = sqlite3_column_int(query, 6);
-}
-
-static void node_bind_metadata(const node_t *self, sqlite3_stmt *query,
-                               int offset) {
-  sqlite3_bind_int(query, offset + 1, self->type);
-  sqlite3_bind_int64(query, offset + 2, self->date);
-  if(self->type == TYPE_FILE)
-    sqlite3_bind_blob(query, offset + 3, self->hash, 16, SQLITE_STATIC);
-  else
-    sqlite3_bind_null(query, offset + 3);
-  sqlite3_bind_int(query, offset + 4, self->status);
-}
-
-static void node_bind_with_id(const node_t *self, sqlite3_stmt *query) {
-  sqlite3_bind_int(query, 1, self->id);
-  node_bind_metadata(self, query, 1);
-}
-
-static void node_bind_with_path(const node_t *self, sqlite3_stmt *query) {
-  sqlite3_bind_int(query, 1, self->parent);
-  sqlite3_bind_text(query, 2, self->name, -1, SQLITE_STATIC);
-  node_bind_metadata(self, query, 2);
-}
-
 bool node_ops_select(node_ops_t *self, node_t *node, int parent,
                      const char *name) {
   bool result;
   sqlite3_stmt *query = self->select;
 
-  sqlite3_bind_int(query, 1, parent);
-  sqlite3_bind_text(query, 2, name, -1, SQLITE_STATIC);
+  node_ops_bind_path(query, parent, name);
   if((result = sqlite3_step(query) == SQLITE_ROW))
     node_from_query(node, query);
   sqlite3_reset(query);
@@ -138,6 +112,51 @@ bool node_ops_select_root(node_ops_t *self, node_list_t *list) {
     node_from_query(node_list_reserve(list), query);
   sqlite3_reset(query);
   return result == SQLITE_DONE;
+}
+
+static void node_ops_bind_id(sqlite3_stmt *query, int id) {
+  sqlite3_bind_int(query, 1, id);
+}
+
+static void node_ops_bind_path(sqlite3_stmt *query, int parent,
+                               const char *name) {
+  sqlite3_bind_int(query, 1, parent);
+  sqlite3_bind_text(query, 2, name, -1, SQLITE_STATIC);
+}
+
+static void node_from_query(node_t *self, sqlite3_stmt *query) {
+  memset(self, 0, sizeof(node_t));
+  self->id = sqlite3_column_int(query, 0);
+  self->parent = sqlite3_column_int(query, 1);
+  strncpy(self->name, (const char *)sqlite3_column_text(query, 2), NAME_MAX);
+  self->type = sqlite3_column_int(query, 3);
+  self->date = sqlite3_column_int64(query, 4);
+  if(self->type == TYPE_FILE)
+    memcpy(self->hash, sqlite3_column_blob(query, 5), 16);
+  self->status = sqlite3_column_int(query, 6);
+}
+
+static void node_bind_with_id(const node_t *self, sqlite3_stmt *query) {
+  node_ops_bind_id(query, self->id);
+  node_bind_metadata(self, query, 1);
+}
+
+static void node_bind_with_path(const node_t *self, sqlite3_stmt *query) {
+  sqlite3_bind_int(query, 1, self->parent);
+  sqlite3_bind_text(query, 2, self->name, -1, SQLITE_STATIC);
+  node_ops_bind_path(query, self->parent, self->name);
+  node_bind_metadata(self, query, 2);
+}
+
+static void node_bind_metadata(const node_t *self, sqlite3_stmt *query,
+                               int offset) {
+  sqlite3_bind_int(query, offset + 1, self->type);
+  sqlite3_bind_int64(query, offset + 2, self->date);
+  if(self->type == TYPE_FILE)
+    sqlite3_bind_blob(query, offset + 3, self->hash, 16, SQLITE_STATIC);
+  else
+    sqlite3_bind_null(query, offset + 3);
+  sqlite3_bind_int(query, offset + 4, self->status);
 }
 
 void node_list_init(node_list_t *self) {
