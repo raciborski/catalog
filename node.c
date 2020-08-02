@@ -3,20 +3,15 @@
  * written by: raciborski *
  **************************/
 
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "node.h"
 
-static const char *node_status_sym[] = {GREY "not" RESET, BGREEN "add" RESET,
-                                        RED "del" RESET, BWHITE "mod" RESET};
-
 static void node_ops_bind_id(sqlite3_stmt *query, int id);
 static void node_ops_bind_path(sqlite3_stmt *query, int parent,
                                const char *name);
-static void node_from_query(node_t *self, sqlite3_stmt *query);
 static void node_bind_with_id(const node_t *self, sqlite3_stmt *query);
 static void node_bind_with_path(const node_t *self, sqlite3_stmt *query);
 static void node_bind_metadata(const node_t *self, sqlite3_stmt *query,
@@ -61,7 +56,7 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
 
   sqlite3_prepare_v2(db,
                      "SELECT "
-                     "  id, parent, name, type, date, hash, status "
+                     " name "
                      "FROM nodes "
                      "WHERE parent IS NULL;",
                      -1, &self->select_root, NULL);
@@ -114,8 +109,17 @@ bool node_ops_select(node_ops_t *self, node_t *node, int parent,
   sqlite3_stmt *query = self->select;
 
   node_ops_bind_path(query, parent, name);
-  if((result = sqlite3_step(query) == SQLITE_ROW))
-    node_from_query(node, query);
+  if((result = sqlite3_step(query) == SQLITE_ROW)) {
+    memset(node, 0, sizeof(node_t));
+    node->id = sqlite3_column_int(query, 0);
+    node->parent = sqlite3_column_int(query, 1);
+    strncpy(node->name, (const char *)sqlite3_column_text(query, 2), NAME_MAX);
+    node->type = sqlite3_column_int(query, 3);
+    node->date = sqlite3_column_int64(query, 4);
+    if(node->type == TYPE_FILE)
+      memcpy(node->hash, sqlite3_column_blob(query, 5), 16);
+    node->status = sqlite3_column_int(query, 6);
+  }
   sqlite3_reset(query);
   return result;
 }
@@ -141,13 +145,17 @@ bool node_ops_update(node_ops_t *self, const node_t *node) {
   return result;
 }
 
-bool node_ops_select_root(node_ops_t *self, node_list_t *list) {
+bool node_ops_select_root(node_ops_t *self,
+                          bool (*callback)(node_ops_t *, const char *)) {
   int result;
+  const char *path;
   sqlite3_stmt *query = self->select_root;
 
-  node_list_init(list);
-  while((result = sqlite3_step(query)) == SQLITE_ROW)
-    node_from_query(node_list_reserve(list), query);
+  while((result = sqlite3_step(query)) == SQLITE_ROW) {
+    path = (const char *)sqlite3_column_text(query, 0);
+    if(!callback(self, path))
+      break;
+  }
   sqlite3_reset(query);
   return result == SQLITE_DONE;
 }
@@ -161,7 +169,8 @@ bool node_ops_mark_all(node_ops_t *self) {
   return result;
 }
 
-bool node_ops_print_changes(node_ops_t *self) {
+bool node_ops_select_changes(node_ops_t *self,
+                             void (*callback)(const char *, node_status_t)) {
   int result;
   const char *path;
   node_status_t status;
@@ -170,7 +179,7 @@ bool node_ops_print_changes(node_ops_t *self) {
   while((result = sqlite3_step(query)) == SQLITE_ROW) {
     path = (const char *)sqlite3_column_text(query, 0);
     status = sqlite3_column_int(query, 1);
-    printf("[%s] %s\n", node_status_sym[status], path);
+    callback(path, status);
   }
   sqlite3_reset(query);
   return result == SQLITE_DONE;
@@ -184,18 +193,6 @@ static void node_ops_bind_path(sqlite3_stmt *query, int parent,
                                const char *name) {
   sqlite3_bind_int(query, 1, parent);
   sqlite3_bind_text(query, 2, name, -1, SQLITE_STATIC);
-}
-
-static void node_from_query(node_t *self, sqlite3_stmt *query) {
-  memset(self, 0, sizeof(node_t));
-  self->id = sqlite3_column_int(query, 0);
-  self->parent = sqlite3_column_int(query, 1);
-  strncpy(self->name, (const char *)sqlite3_column_text(query, 2), NAME_MAX);
-  self->type = sqlite3_column_int(query, 3);
-  self->date = sqlite3_column_int64(query, 4);
-  if(self->type == TYPE_FILE)
-    memcpy(self->hash, sqlite3_column_blob(query, 5), 16);
-  self->status = sqlite3_column_int(query, 6);
 }
 
 static void node_bind_with_id(const node_t *self, sqlite3_stmt *query) {
@@ -221,20 +218,24 @@ static void node_bind_metadata(const node_t *self, sqlite3_stmt *query,
   sqlite3_bind_int(query, offset + 4, self->status);
 }
 
-void node_list_init(node_list_t *self) {
-  self->length = 0;
-  self->size = 1;
-  self->items = malloc(sizeof(node_t));
+void node_init(node_t *self, int parent, const char *name, node_type_t type,
+               time_t date) {
+  self->parent = parent;
+  strncpy(self->name, name, NAME_MAX);
+  self->type = type;
+  if(type == TYPE_FILE)
+    memset(self->hash, 1, 16);
+  self->date = date;
+  self->status = STATUS_ADD;
 }
 
-void node_list_dest(node_list_t *self) {
-  free(self->items);
-}
-
-node_t *node_list_reserve(node_list_t *self) {
-  if(++self->length >= self->size) {
-    self->size *= 2;
-    self->items = realloc(self->items, sizeof(node_t) * self->size);
+void node_sync(node_t *self, time_t date) {
+  if(self->date != date) {
+    self->date = date;
+    self->status = STATUS_MOD;
+    if(self->type == TYPE_FILE)
+      memset(self->hash, 2, 16);
   }
-  return self->items + self->length - 1;
+  else
+    self->status = STATUS_NORM;
 }
