@@ -56,7 +56,7 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
 
   sqlite3_prepare_v2(db,
                      "SELECT "
-                     " name "
+                     "  name "
                      "FROM nodes "
                      "WHERE parent IS NULL;",
                      -1, &self->select_root, NULL);
