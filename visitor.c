@@ -22,17 +22,6 @@
 static const char *node_status_sym[] = {GREY "not" RESET, BGREEN "add" RESET,
                                         RED "del" RESET, BWHITE "mod" RESET};
 
-static bool sync_folder(node_ops_t *ops, int dir_id, int dir_fd);
-
-bool visit_root_path(node_ops_t *ops, const char *path) {
-  int dir_fd = open(path, O_RDONLY);
-  bool result;
-
-  if((result = sync_folder(ops, 1, dir_fd)))
-    close(dir_fd);
-  return result;
-}
-
 static bool sync_folder(node_ops_t *ops, int dir_id, int dir_fd) {
   DIR *stream;
   node_t node;
@@ -66,6 +55,15 @@ static bool sync_folder(node_ops_t *ops, int dir_id, int dir_fd) {
 
   closedir(stream);
   return true;
+}
+
+bool visit_root_path(node_ops_t *ops, const char *path) {
+  int dir_fd = open(path, O_RDONLY);
+  bool result;
+
+  if((result = sync_folder(ops, 1, dir_fd)))
+    close(dir_fd);
+  return result;
 }
 
 void visit_path_with_status(const char *path, node_status_t status) {
