@@ -48,8 +48,8 @@ bool node_ops_select_root(node_ops_t *self,
                           bool (*callback)(node_ops_t *, const char *));
 bool node_ops_select_changes(node_ops_t *self,
                              void (*callback)(const char *, node_status_t));
-void node_init(node_t *self, int parent, const char *name, node_type_t type,
-               time_t date);
-void node_sync(node_t *self, time_t date);
+void node_init(node_t *self, int dir_fd, int parent, const char *name,
+               node_type_t type, time_t date);
+void node_sync(node_t *self, int dir_fd, time_t date);
 
 #endif

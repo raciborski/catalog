@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "keccak.h"
 #include "node.h"
 
 static void node_ops_bind_id(sqlite3_stmt *query, int id);
@@ -234,24 +235,33 @@ static void node_bind_metadata(const node_t *self, sqlite3_stmt *query,
   sqlite3_bind_int(query, offset + 4, self->status);
 }
 
-void node_init(node_t *self, int parent, const char *name, node_type_t type,
-               time_t date) {
+void node_init(node_t *self, int dir_fd, int parent, const char *name,
+               node_type_t type, time_t date) {
   self->parent = parent;
   strncpy(self->name, name, NAME_MAX);
   self->type = type;
   if(type == TYPE_FILE)
-    memset(self->hash, 1, 16);
+    sha3_file(self->hash, dir_fd, name);
   self->date = date;
   self->status = STATUS_ADD;
 }
 
-void node_sync(node_t *self, time_t date) {
+void node_sync(node_t *self, int dir_fd, time_t date) {
+  uint8_t new_hash[16];
+
   if(self->date != date) {
     self->date = date;
-    self->status = STATUS_MOD;
-    if(self->type == TYPE_FILE)
-      memset(self->hash, 2, 16);
+    if(self->type == TYPE_FILE) {
+      sha3_file(new_hash, dir_fd, self->name);
+      if(memcmp(self->hash, new_hash, 16)) {
+        memcpy(self->hash, new_hash, 16);
+        self->status = STATUS_MOD;
+      }
+      else
+        self->status = STATUS_NORM;
+    }
+    else
+      self->status = STATUS_MOD;
   }
-  else
-    self->status = STATUS_NORM;
+  else self->status = STATUS_NORM;
 }

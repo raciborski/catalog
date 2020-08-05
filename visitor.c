@@ -13,12 +13,6 @@
 
 #include "visitor.h"
 
-#define GREY   "\e[30;1m"
-#define RED    "\e[31m"
-#define BGREEN "\e[32;1m"
-#define BWHITE "\e[37;1m"
-#define RESET  "\e[0m"
-
 static const char *node_status_sym[] = {GREY "not" RESET, BGREEN "add" RESET,
                                         RED "del" RESET, BWHITE "mod" RESET};
 
@@ -38,13 +32,13 @@ static bool sync_folder(node_ops_t *ops, int dir_id, int dir_fd) {
       continue;
 
     if(!node_ops_select(ops, &node, dir_id, entry->d_name)) {
-      node_init(&node, dir_id, entry->d_name,
+      node_init(&node, dir_fd, dir_id, entry->d_name,
                 S_ISREG(props.st_mode) ? TYPE_FILE : TYPE_FOLDER,
                 props.st_mtime);
       node_ops_insert(ops, &node);
     }
     else {
-      node_sync(&node, props.st_mtime);
+      node_sync(&node, dir_fd, props.st_mtime);
       node_ops_update(ops, &node);
     }
     if(node.type == TYPE_FOLDER) {
