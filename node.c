@@ -96,7 +96,9 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
     "FROM "
     "  paths "
     "WHERE "
-    "  status != 0;",
+    "  status != 0 "
+    "ORDER BY "
+    "  name;",
     -1, &self->select_changes, NULL);
 }
 
