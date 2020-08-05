@@ -33,13 +33,14 @@ static bool sync_folder(node_ops_t *ops, int dir_id, int dir_fd) {
     return false;
 
   while((entry = readdir(stream)) != NULL) {
-    if(!strcmp(".", entry->d_name) || !strcmp("..", entry->d_name))
+    if(!strcmp(".", entry->d_name) || !strcmp("..", entry->d_name) ||
+       fstatat(dir_fd, entry->d_name, &props, 0))
       continue;
 
-    fstatat(dir_fd, entry->d_name, &props, 0);
     if(!node_ops_select(ops, &node, dir_id, entry->d_name)) {
-      node_init(&node, dir_id, entry->d_name, props.st_mtime,
-                S_ISREG(props.st_mode) ? TYPE_FILE : TYPE_FOLDER);
+      node_init(&node, dir_id, entry->d_name,
+                S_ISREG(props.st_mode) ? TYPE_FILE : TYPE_FOLDER,
+                props.st_mtime);
       node_ops_insert(ops, &node);
     }
     else {
