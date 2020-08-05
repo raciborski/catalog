@@ -63,9 +63,9 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
 
   sqlite3_prepare_v2(db,
                      "UPDATE nodes "
-                     "SET status = 2 "
+                     "SET status = ?1 "
                      "WHERE parent IS NOT NULL;",
-                     -1, &self->mark_all, NULL);
+                     -1, &self->mark_branches, NULL);
 
   sqlite3_prepare_v2(
     db,
@@ -91,7 +91,12 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
     "  paths "
     "WHERE "
     "  status != 0;",
-    -1, &self->print_changes, NULL);
+    -1, &self->select_changes, NULL);
+
+  sqlite3_prepare_v2(db,
+                     "DELETE FROM nodes "
+                     "WHERE status = 2;",
+                     -1, &self->delete_marked, NULL);
 }
 
 void node_ops_dest(node_ops_t *self) {
@@ -99,8 +104,9 @@ void node_ops_dest(node_ops_t *self) {
   sqlite3_finalize(self->insert);
   sqlite3_finalize(self->update);
   sqlite3_finalize(self->select_root);
-  sqlite3_finalize(self->mark_all);
-  sqlite3_finalize(self->print_changes);
+  sqlite3_finalize(self->mark_branches);
+  sqlite3_finalize(self->select_changes);
+  sqlite3_finalize(self->delete_marked);
 }
 
 bool node_ops_select(node_ops_t *self, node_t *node, int parent,
@@ -160,10 +166,11 @@ bool node_ops_select_root(node_ops_t *self,
   return result == SQLITE_DONE;
 }
 
-bool node_ops_mark_all(node_ops_t *self) {
+bool node_ops_mark_branches(node_ops_t *self, node_status_t status) {
   bool result;
-  sqlite3_stmt *query = self->mark_all;
+  sqlite3_stmt *query = self->mark_branches;
 
+  sqlite3_bind_int(query, 1, status);
   result = sqlite3_step(query) == SQLITE_DONE;
   sqlite3_reset(query);
   return result;
@@ -174,7 +181,7 @@ bool node_ops_select_changes(node_ops_t *self,
   int result;
   const char *path;
   node_status_t status;
-  sqlite3_stmt *query = self->print_changes;
+  sqlite3_stmt *query = self->select_changes;
 
   while((result = sqlite3_step(query)) == SQLITE_ROW) {
     path = (const char *)sqlite3_column_text(query, 0);
@@ -183,6 +190,15 @@ bool node_ops_select_changes(node_ops_t *self,
   }
   sqlite3_reset(query);
   return result == SQLITE_DONE;
+}
+
+bool node_ops_delete_marked(node_ops_t *self) {
+  bool result;
+  sqlite3_stmt *query = self->delete_marked;
+
+  result = sqlite3_step(query) == SQLITE_DONE;
+  sqlite3_reset(query);
+  return result;
 }
 
 static void node_ops_bind_id(sqlite3_stmt *query, int id) {
