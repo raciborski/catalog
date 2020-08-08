@@ -74,7 +74,7 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
 
   sqlite3_prepare_v2(db,
                      "SELECT "
-                     "  name "
+                     "  id, name "
                      "FROM nodes "
                      "WHERE parent IS NULL;",
                      -1, &self->select_root, NULL);
@@ -192,14 +192,17 @@ bool node_ops_remove_marked(node_ops_t *self) {
 }
 
 bool node_ops_select_root(node_ops_t *self,
-                          bool (*callback)(node_ops_t *, const char *)) {
-  int result;
+                          bool (*callback)(node_ops_t *, int, const char *,
+                                           bool),
+                          bool force) {
+  int id, result;
   const char *path;
   sqlite3_stmt *query = self->select_root;
 
   while((result = sqlite3_step(query)) == SQLITE_ROW) {
-    path = (const char *)sqlite3_column_text(query, 0);
-    if(!callback(self, path))
+    id = sqlite3_column_int(query, 0);
+    path = (const char *)sqlite3_column_text(query, 1);
+    if(!callback(self, id, path, force))
       break;
   }
   sqlite3_reset(query);
@@ -267,10 +270,10 @@ void node_init(node_t *self, int dir_fd, int parent, const char *name,
   self->status = STATUS_ADD;
 }
 
-void node_sync(node_t *self, int dir_fd, time_t date) {
+void node_sync(node_t *self, int dir_fd, time_t date, bool force) {
   uint8_t new_hash[16];
 
-  if(self->date != date) {
+  if(self->date != date || (force && self->type == TYPE_FILE)) {
     self->date = date;
     if(self->type == TYPE_FILE) {
       sha3_file(new_hash, dir_fd, self->name);
@@ -284,5 +287,6 @@ void node_sync(node_t *self, int dir_fd, time_t date) {
     else
       self->status = STATUS_MOD;
   }
-  else self->status = STATUS_NORM;
+  else
+    self->status = STATUS_NORM;
 }
