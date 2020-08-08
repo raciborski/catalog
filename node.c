@@ -20,6 +20,7 @@ static void node_bind_metadata(const node_t *self, sqlite3_stmt *query,
 
 void node_ops_init(node_ops_t *self, sqlite3 *db) {
   sqlite3_exec(db,
+               "PRAGMA foreign_keys = ON;"
                "CREATE TABLE IF NOT EXISTS nodes("
                "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
                "  parent INTEGER,"
@@ -29,7 +30,7 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
                "  hash BLOB CHECK(length(hash) = 16),"
                "  status INTEGER NOT NULL CHECK(status BETWEEN 0 AND 3),"
                "  UNIQUE(parent, name),"
-               "  FOREIGN KEY(parent) REFERENCES nodes(id)"
+               "  FOREIGN KEY(parent) REFERENCES nodes(id) ON DELETE CASCADE"
                ");",
                NULL, NULL, NULL);
 
