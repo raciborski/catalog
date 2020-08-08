@@ -10,11 +10,11 @@
 #include "keccak.h"
 #include "node.h"
 
-static void node_ops_bind_id(sqlite3_stmt *query, int id);
-static void node_ops_bind_path(sqlite3_stmt *query, int parent,
-                               const char *name);
 static void node_bind_with_id(const node_t *self, sqlite3_stmt *query);
+static void node_bind_only_id(sqlite3_stmt *query, int id);
 static void node_bind_with_path(const node_t *self, sqlite3_stmt *query);
+static void node_bind_only_path(sqlite3_stmt *query, int parent,
+                                const char *name);
 static void node_bind_metadata(const node_t *self, sqlite3_stmt *query,
                                int offset);
 
@@ -118,7 +118,7 @@ bool node_ops_select(node_ops_t *self, node_t *node, int parent,
   bool result;
   sqlite3_stmt *query = self->select;
 
-  node_ops_bind_path(query, parent, name);
+  node_bind_only_path(query, parent, name);
   if((result = sqlite3_step(query) == SQLITE_ROW)) {
     memset(node, 0, sizeof(node_t));
     node->id = sqlite3_column_int(query, 0);
@@ -205,30 +205,27 @@ bool node_ops_select_changes(node_ops_t *self,
   return result == SQLITE_DONE;
 }
 
-static void node_ops_bind_id(sqlite3_stmt *query, int id) {
+static void node_bind_with_id(const node_t *self, sqlite3_stmt *query) {
+  node_bind_only_id(query, self->id);
+  node_bind_metadata(self, query, 1);
+}
+
+static void node_bind_only_id(sqlite3_stmt *query, int id) {
   sqlite3_bind_int(query, 1, id);
 }
 
-static void node_ops_bind_path(sqlite3_stmt *query, int parent,
-                               const char *name) {
-  sqlite3_bind_int(query, 1, parent);
+static void node_bind_with_path(const node_t *self, sqlite3_stmt *query) {
+  node_bind_only_path(query, self->parent, self->name);
+  node_bind_metadata(self, query, 2);
+}
+
+static void node_bind_only_path(sqlite3_stmt *query, int parent,
+                                const char *name) {
   if(parent >= 0)
     sqlite3_bind_int(query, 1, parent);
   else
     sqlite3_bind_null(query, 1);
   sqlite3_bind_text(query, 2, name, -1, SQLITE_STATIC);
-}
-
-static void node_bind_with_id(const node_t *self, sqlite3_stmt *query) {
-  node_ops_bind_id(query, self->id);
-  node_bind_metadata(self, query, 1);
-}
-
-static void node_bind_with_path(const node_t *self, sqlite3_stmt *query) {
-  sqlite3_bind_int(query, 1, self->parent);
-  sqlite3_bind_text(query, 2, self->name, -1, SQLITE_STATIC);
-  node_ops_bind_path(query, self->parent, self->name);
-  node_bind_metadata(self, query, 2);
 }
 
 static void node_bind_metadata(const node_t *self, sqlite3_stmt *query,
