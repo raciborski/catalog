@@ -57,6 +57,11 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
                      -1, &self->update, NULL);
 
   sqlite3_prepare_v2(db,
+                     "DELETE FROM nodes "
+                     "WHERE parent IS ?1 AND name = ?2;",
+                     -1, &self->remove, NULL);
+
+  sqlite3_prepare_v2(db,
                      "UPDATE nodes "
                      "SET status = ?1 "
                      "WHERE parent IS NOT NULL;",
@@ -65,7 +70,7 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
   sqlite3_prepare_v2(db,
                      "DELETE FROM nodes "
                      "WHERE status = 2;",
-                     -1, &self->delete_marked, NULL);
+                     -1, &self->remove_marked, NULL);
 
   sqlite3_prepare_v2(db,
                      "SELECT "
@@ -107,8 +112,9 @@ void node_ops_dest(node_ops_t *self) {
   sqlite3_finalize(self->select);
   sqlite3_finalize(self->insert);
   sqlite3_finalize(self->update);
+  sqlite3_finalize(self->remove);
   sqlite3_finalize(self->mark_branches);
-  sqlite3_finalize(self->delete_marked);
+  sqlite3_finalize(self->remove_marked);
   sqlite3_finalize(self->select_root);
   sqlite3_finalize(self->select_changes);
 }
@@ -155,6 +161,17 @@ bool node_ops_update(node_ops_t *self, const node_t *node) {
   return result;
 }
 
+bool node_ops_remove(node_ops_t *self, int parent, const char *path) {
+  bool result;
+  sqlite3_stmt *query = self->remove;
+
+  node_bind_only_path(query, parent, path);
+  result = sqlite3_step(query) == SQLITE_DONE &&
+           sqlite3_changes(sqlite3_db_handle(query));
+  sqlite3_reset(query);
+  return result;
+}
+
 bool node_ops_mark_branches(node_ops_t *self, node_status_t status) {
   bool result;
   sqlite3_stmt *query = self->mark_branches;
@@ -165,9 +182,9 @@ bool node_ops_mark_branches(node_ops_t *self, node_status_t status) {
   return result;
 }
 
-bool node_ops_delete_marked(node_ops_t *self) {
+bool node_ops_remove_marked(node_ops_t *self) {
   bool result;
-  sqlite3_stmt *query = self->delete_marked;
+  sqlite3_stmt *query = self->remove_marked;
 
   result = sqlite3_step(query) == SQLITE_DONE;
   sqlite3_reset(query);

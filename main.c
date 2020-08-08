@@ -25,7 +25,7 @@ int main(void) {
     node_ops_mark_branches(&ops, STATUS_DEL);
     if(node_ops_select_root(&ops, visit_root_path)) {
       node_ops_select_changes(&ops, visit_path_with_status);
-      node_ops_delete_marked(&ops);
+      node_ops_remove_marked(&ops);
       node_ops_mark_branches(&ops, STATUS_NORM);
     }
     else
