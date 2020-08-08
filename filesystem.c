@@ -72,8 +72,8 @@ void check_root_paths(node_ops_t *ops, bool force) {
 
 static bool visit_root_path(node_ops_t *ops, int dir_id, const char *path,
                             bool force) {
-  int dir_fd = open(path, O_RDONLY);
   bool result;
+  int dir_fd = open(path, O_RDONLY);
 
   if((result = sync_folder(ops, dir_id, dir_fd, force)))
     close(dir_fd);
