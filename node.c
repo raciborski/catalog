@@ -263,6 +263,7 @@ bool node_ops_select_changes(node_ops_t *self,
 
 void node_init(node_t *self, int dir_fd, int parent, const char *name,
                node_type_t type, time_t date) {
+  memset(self, 0, sizeof(node_t));
   self->parent = parent;
   strncpy(self->name, name, NAME_MAX);
   self->type = type;
