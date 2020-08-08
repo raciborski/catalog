@@ -38,7 +38,7 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
                      "SELECT "
                      "  id, parent, name, type, date, hash, status "
                      "FROM nodes "
-                     "WHERE parent = ?1 AND name = ?2;",
+                     "WHERE parent IS ?1 AND name = ?2;",
                      -1, &self->select, NULL);
 
   sqlite3_prepare_v2(db,
@@ -212,6 +212,10 @@ static void node_ops_bind_id(sqlite3_stmt *query, int id) {
 static void node_ops_bind_path(sqlite3_stmt *query, int parent,
                                const char *name) {
   sqlite3_bind_int(query, 1, parent);
+  if(parent >= 0)
+    sqlite3_bind_int(query, 1, parent);
+  else
+    sqlite3_bind_null(query, 1);
   sqlite3_bind_text(query, 2, name, -1, SQLITE_STATIC);
 }
 
