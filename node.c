@@ -225,6 +225,38 @@ bool node_ops_select_changes(node_ops_t *self,
   return result == SQLITE_DONE;
 }
 
+void node_init(node_t *self, int dir_fd, int parent, const char *name,
+               node_type_t type, time_t date) {
+  self->parent = parent;
+  strncpy(self->name, name, NAME_MAX);
+  self->type = type;
+  if(type == TYPE_FILE)
+    sha3_file(self->hash, dir_fd, name);
+  self->date = date;
+  self->status = STATUS_ADD;
+}
+
+void node_sync(node_t *self, int dir_fd, time_t date, bool force) {
+  uint8_t new_hash[16];
+
+  if(self->date != date || (force && self->type == TYPE_FILE)) {
+    self->date = date;
+    if(self->type == TYPE_FILE) {
+      sha3_file(new_hash, dir_fd, self->name);
+      if(memcmp(self->hash, new_hash, 16)) {
+        memcpy(self->hash, new_hash, 16);
+        self->status = STATUS_MOD;
+      }
+      else
+        self->status = STATUS_NORM;
+    }
+    else
+      self->status = STATUS_MOD;
+  }
+  else
+    self->status = STATUS_NORM;
+}
+
 static void node_bind_with_id(const node_t *self, sqlite3_stmt *query) {
   node_bind_only_id(query, self->id);
   node_bind_metadata(self, query, 1);
@@ -257,36 +289,4 @@ static void node_bind_metadata(const node_t *self, sqlite3_stmt *query,
   else
     sqlite3_bind_null(query, offset + 3);
   sqlite3_bind_int(query, offset + 4, self->status);
-}
-
-void node_init(node_t *self, int dir_fd, int parent, const char *name,
-               node_type_t type, time_t date) {
-  self->parent = parent;
-  strncpy(self->name, name, NAME_MAX);
-  self->type = type;
-  if(type == TYPE_FILE)
-    sha3_file(self->hash, dir_fd, name);
-  self->date = date;
-  self->status = STATUS_ADD;
-}
-
-void node_sync(node_t *self, int dir_fd, time_t date, bool force) {
-  uint8_t new_hash[16];
-
-  if(self->date != date || (force && self->type == TYPE_FILE)) {
-    self->date = date;
-    if(self->type == TYPE_FILE) {
-      sha3_file(new_hash, dir_fd, self->name);
-      if(memcmp(self->hash, new_hash, 16)) {
-        memcpy(self->hash, new_hash, 16);
-        self->status = STATUS_MOD;
-      }
-      else
-        self->status = STATUS_NORM;
-    }
-    else
-      self->status = STATUS_MOD;
-  }
-  else
-    self->status = STATUS_NORM;
 }
