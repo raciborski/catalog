@@ -14,8 +14,8 @@
 #include <sqlite3.h>
 
 typedef struct node_ops_t {
-  sqlite3_stmt *select, *insert, *update, *remove, *mark_branches,
-    *remove_marked, *select_root, *select_changes;
+  sqlite3_stmt *begin, *end, *rollback, *select, *insert, *update, *remove,
+    *mark_branches, *remove_marked, *select_root, *select_changes;
 } node_ops_t;
 
 typedef enum node_type_t { TYPE_FOLDER, TYPE_FILE } node_type_t;
@@ -38,6 +38,9 @@ typedef struct node_t {
 
 void node_ops_init(node_ops_t *self, sqlite3 *db);
 void node_ops_dest(node_ops_t *self);
+bool node_ops_begin(node_ops_t *self);
+bool node_ops_end(node_ops_t *self);
+bool node_ops_rollback(node_ops_t *self);
 bool node_ops_select(node_ops_t *self, node_t *node, int parent,
                      const char *name);
 bool node_ops_insert(node_ops_t *self, node_t *node);

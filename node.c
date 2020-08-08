@@ -34,6 +34,12 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
                ");",
                NULL, NULL, NULL);
 
+  sqlite3_prepare_v2(db, "BEGIN TRANSACTION", -1, &self->begin, NULL);
+
+  sqlite3_prepare_v2(db, "END TRANSACTION", -1, &self->end, NULL);
+
+  sqlite3_prepare_v2(db, "ROLLBACK TRANSACTION", -1, &self->rollback, NULL);
+
   sqlite3_prepare_v2(db,
                      "SELECT "
                      "  id, parent, name, type, date, hash, status "
@@ -109,6 +115,9 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
 }
 
 void node_ops_dest(node_ops_t *self) {
+  sqlite3_finalize(self->begin);
+  sqlite3_finalize(self->end);
+  sqlite3_finalize(self->rollback);
   sqlite3_finalize(self->select);
   sqlite3_finalize(self->insert);
   sqlite3_finalize(self->update);
@@ -117,6 +126,33 @@ void node_ops_dest(node_ops_t *self) {
   sqlite3_finalize(self->remove_marked);
   sqlite3_finalize(self->select_root);
   sqlite3_finalize(self->select_changes);
+}
+
+bool node_ops_begin(node_ops_t *self) {
+  bool result;
+  sqlite3_stmt *query = self->begin;
+
+  result = sqlite3_step(query) == SQLITE_DONE;
+  sqlite3_reset(query);
+  return result;
+}
+
+bool node_ops_end(node_ops_t *self) {
+  bool result;
+  sqlite3_stmt *query = self->end;
+
+  result = sqlite3_step(query) == SQLITE_DONE;
+  sqlite3_reset(query);
+  return result;
+}
+
+bool node_ops_rollback(node_ops_t *self) {
+  bool result;
+  sqlite3_stmt *query = self->rollback;
+
+  result = sqlite3_step(query) == SQLITE_DONE;
+  sqlite3_reset(query);
+  return result;
 }
 
 bool node_ops_select(node_ops_t *self, node_t *node, int parent,

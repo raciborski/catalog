@@ -56,14 +56,18 @@ void delete_root_path(node_ops_t *ops, const char *path) {
 }
 
 void check_root_paths(node_ops_t *ops, bool force) {
+  node_ops_begin(ops);
   node_ops_mark_branches(ops, STATUS_DEL);
   if(node_ops_select_root(ops, visit_root_path, force)) {
     node_ops_select_changes(ops, visit_path_with_status);
     node_ops_remove_marked(ops);
     node_ops_mark_branches(ops, STATUS_NORM);
+    node_ops_end(ops);
   }
-  else
+  else {
     print_fail("Failed to acccess one or multiple folders.");
+    node_ops_rollback(ops);
+  }
 }
 
 static bool visit_root_path(node_ops_t *ops, int dir_id, const char *path,
