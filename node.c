@@ -112,6 +112,33 @@ void node_ops_init(node_ops_t *self, sqlite3 *db) {
     "ORDER BY "
     "  name;",
     -1, &self->select_changes, NULL);
+
+  sqlite3_prepare_v2(db,
+                     "WITH RECURSIVE paths(ancestor, id) AS ( "
+                     "  SELECT "
+                     "    name, id "
+                     "  FROM "
+                     "    nodes "
+                     "  WHERE "
+                     "    parent IS NULL "
+                     "  UNION SELECT "
+                     "    paths.ancestor, nodes.id "
+                     "  FROM "
+                     "    nodes "
+                     "  JOIN "
+                     "    paths "
+                     "  ON "
+                     "   nodes.parent = paths.id "
+                     ") "
+                     "SELECT "
+                     "  ancestor, COUNT(id) AS total "
+                     "FROM "
+                     "  paths "
+                     "GROUP BY "
+                     "  ancestor "
+                     "ORDER BY "
+                     "  total DESC;",
+                     -1, &self->select_total, NULL);
 }
 
 void node_ops_dest(node_ops_t *self) {
@@ -126,6 +153,7 @@ void node_ops_dest(node_ops_t *self) {
   sqlite3_finalize(self->remove_marked);
   sqlite3_finalize(self->select_root);
   sqlite3_finalize(self->select_changes);
+  sqlite3_finalize(self->select_total);
 }
 
 bool node_ops_begin(node_ops_t *self) {
@@ -256,6 +284,21 @@ bool node_ops_select_changes(node_ops_t *self,
     path = (const char *)sqlite3_column_text(query, 0);
     status = sqlite3_column_int(query, 1);
     callback(path, status);
+  }
+  sqlite3_reset(query);
+  return result == SQLITE_DONE;
+}
+
+bool node_ops_select_total(node_ops_t *self,
+                           void (*callback)(const char *, int)) {
+  int result, total;
+  const char *path;
+  sqlite3_stmt *query = self->select_total;
+
+  while((result = sqlite3_step(query)) == SQLITE_ROW) {
+    path = (const char *)sqlite3_column_text(query, 0);
+    total = sqlite3_column_int(query, 1);
+    callback(path, total);
   }
   sqlite3_reset(query);
   return result == SQLITE_DONE;

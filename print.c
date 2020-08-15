@@ -8,12 +8,14 @@
 #include "print.h"
 
 void print_help() {
-  printf("|> %scatalog%s [-fad] [path]\n"
-         "------------------------\n"
-         "  * %s-f%s       Force re-hashing of every node.\n"
+  printf("|> %scatalog%s [-adlf] [path]\n"
+         "-------------------------\n"
          "  * %s-a path%s  Add new path to the database.\n"
-         "  * %s-d path%s  Delete path from the database.\n\n",
-         BCYAN, RESET, BWHITE, RESET, BWHITE, RESET, BWHITE, RESET);
+         "  * %s-d path%s  Delete path from the database.\n"
+         "  * %s-l%s       List root paths in the database.\n"
+         "  * %s-f%s       Force re-hashing of every node.\n\n",
+         BCYAN, RESET, BWHITE, RESET, BWHITE, RESET, BWHITE, RESET, BWHITE,
+         RESET);
 }
 
 void print_info(const char *message) {

@@ -15,7 +15,8 @@
 
 typedef struct node_ops_t {
   sqlite3_stmt *begin, *end, *rollback, *select, *insert, *update, *remove,
-    *mark_branches, *remove_marked, *select_root, *select_changes;
+    *mark_branches, *remove_marked, *select_root, *select_changes,
+    *select_total;
 } node_ops_t;
 
 typedef enum node_type_t { TYPE_FOLDER, TYPE_FILE } node_type_t;
@@ -54,6 +55,8 @@ bool node_ops_select_root(node_ops_t *self,
                           bool force);
 bool node_ops_select_changes(node_ops_t *self,
                              void (*callback)(const char *, node_status_t));
+bool node_ops_select_total(node_ops_t *self,
+                           void (*callback)(const char *, int));
 void node_init(node_t *self, int dir_fd, int parent, const char *name,
                node_type_t type, time_t date);
 void node_sync(node_t *self, int dir_fd, time_t date, bool force);

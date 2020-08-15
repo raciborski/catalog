@@ -23,6 +23,8 @@ int main(int argc, char *argv[]) {
       add_root_path(&ops, argv[2]);
     else if(argc == 3 && !strcmp("-d", argv[1]))
       delete_root_path(&ops, argv[2]);
+    else if(argc == 2 && !strcmp("-l", argv[1]))
+      list_root_paths(&ops);
     else if(argc == 2 && !strcmp("-f", argv[1]))
       check_root_paths(&ops, true);
     else if(argc == 1)

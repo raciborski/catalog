@@ -18,6 +18,7 @@
 static const char *node_status_sym[] = {GREY "not" RESET, BGREEN "add" RESET,
                                         RED "del" RESET, BWHITE "mod" RESET};
 
+static void visit_root_path_with_total(const char *path, int total);
 static bool visit_root_path(node_ops_t *ops, int dir_id, const char *path,
                             bool force);
 static bool sync_folder(node_ops_t *ops, int dir_id, int dir_fd, bool force);
@@ -53,6 +54,14 @@ void delete_root_path(node_ops_t *ops, const char *path) {
     print_info("Path deleted successfully.");
   else
     print_fail("Path does not exist in the database.");
+}
+
+void list_root_paths(node_ops_t *ops) {
+  node_ops_select_total(ops, visit_root_path_with_total);
+}
+
+static void visit_root_path_with_total(const char *path, int total) {
+  printf("%s%10d#%s  %s%s%s\n", MAGENTA, total, RESET, BLUE, path, RESET);
 }
 
 void check_root_paths(node_ops_t *ops, bool force) {
